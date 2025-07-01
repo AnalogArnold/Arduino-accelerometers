@@ -1,0 +1,118 @@
+import matplotlib.pyplot as plt
+import smplotlib
+import numpy as np
+from scipy.fft import rfft, rfftfreq
+from scipy.signal import windows
+from os import path, mkdir
+
+# Functions written for accelerometer data stored in pandas dataframe with columns: index, timestamp [ms], x, y, z, sensor_id.
+def main_processing_function(single_sensor_data, sensor_id, interval, processing_choice="Acceleration vs time", saving_choice=False, saving_location=None):
+    try:
+        save_path = None
+        if saving_choice and saving_location is None:
+            raise ValueError("Saving location must be provided if you choose to save the results.")
+        if saving_location is not None:
+            save_path = str(saving_location) + '/S_' + str(sensor_id)
+            if not path.exists(saving_location):
+                mkdir(saving_location)
+
+        timestamp = single_sensor_data['normalized_timestamp']  # Use only normalized timestamp, not the number coming from Arduino as a default
+        x_accel = single_sensor_data['x-acceleration']
+        y_accel = single_sensor_data['y-acceleration']
+        z_accel = single_sensor_data['z-acceleration']
+        if processing_choice == "Acceleration vs time":
+            acceleration_vs_time(timestamp, x_accel, y_accel, z_accel, sensor_id, saving_choice, save_path)
+        elif processing_choice == "Magnitude of acceleration":
+            magnitude_of_acceleration(x_accel, y_accel, z_accel, sensor_id, saving_choice, save_path)
+        elif processing_choice == "Fast Fourier transform":
+            fft_analysis(timestamp, x_accel, y_accel, z_accel, sensor_id, interval, saving_choice, save_path)
+        elif processing_choice == "CSV export":
+                CSV_export(single_sensor_data, save_path)
+        return True
+    except Exception as e:
+        print(f"Unexpected error: {type(e).__name__}: {e}")
+        return False
+
+def acceleration_vs_time(timestamp, x_accel, y_accel, z_accel, sensor_id, saving_choice, save_path):
+    fig, ax = plt.subplots()
+    ax.plot(timestamp, x_accel, label='x-acceleration', color = '#F7CFD8')
+    ax.plot(timestamp, y_accel, label='y-acceleration', color = '#A6D6D6')
+    ax.plot(timestamp, z_accel, label='z-acceleration', color = '#8E7DBE')
+    ax.legend()
+    ax.set_xlabel('Time [s]')
+    ax.set_ylabel('Acceleration (g) [m/s²]')
+    ax.set_title('Acceleration vs time for sensor #' + str(sensor_id))
+    ax.grid()
+    plt.show()
+    if saving_choice:
+        path = save_path + ' acceleration_vs_time.png'
+        fig.savefig(path)
+
+
+
+def magnitude_of_acceleration(timestamp, x_accel, y_accel, z_accel, sensor_id, saving_choice, save_path):
+    magnitude = np.sqrt(x_accel**2 + y_accel**2 + z_accel**2)
+    rms = np.sqrt(np.mean(x_accel**2 + y_accel**2 + z_accel**2))
+    rms_xs = np.full(timestamp.shape, rms)
+    fig, ax = plt.subplots()
+    ax.plot(timestamp, magnitude, color= '#F7CFD8')
+    ax.legend()
+    ax.set_xlabel('Time (s)')
+    ax.set_ylabel('Magnitude of acceleration (g) [m/s²]')
+    ax.set_title('Magnitude of acceleration vs Time for sensor #' + str(sensor_id))
+    ax.grid()
+    ax1=ax.twinx()
+    ax1.plot(timestamp, rms_xs, color='#8E7DBE')
+    ax1.set_ylabel('RMS acceleration (g) $m/s^2$')
+    ax1.tick_params(axis='y', labelcolor='#8E7DBE')
+    plt.show()
+    if saving_choice:
+        path = save_path + ' mag_of_accel.png'
+        fig.savefig(path)
+
+def fft_analysis(x_accel, y_accel, z_accel, sensor_id, interval, saving_choice, save_path):
+    interval_sec = int(interval) / 1000.0  # Convert ms to seconds
+    sample_count = len(x_accel)
+    ax_names = ['x-acceleration', 'y-acceleration', 'z-acceleration']
+    colors = ['#F7CFD8', '#A6D6D6', '#8E7DBE']
+
+    fig, axs = plt.subplots(nrows=3, ncols=1, sharex=True, size=(10,10))
+    plt.subplots_adjust(hspace=0.5)
+    fig.suptitle('FFT Analysis for sensor #' + str(sensor_id), fontsize=18, y=0.98)
+
+    # Process each axis
+    for axis_data, axis_name, figure_axs, color_code in zip([x_accel, y_accel, z_accel], ax_names, axs.ravel(), colors):
+        # Extract data and remove DC offset (non-zero at rest)
+        data = axis_data.values
+        data_centered = data - np.mean(data)
+        data_windowed = data_centered * windows.hann(sample_count)
+
+        # Compute FFT and frequencies
+        magnitudes = rfft(data_windowed)
+        frequencies = rfftfreq(sample_count, d=interval_sec) # Frequencies in the center of each bin of the FFT
+
+        # Plot
+        figure_axs.plot(frequencies, np.abs(magnitudes), color=color_code)
+        figure_axs.set_title(axis_name)
+        figure_axs.grid()
+        figure_axs.set_xlabel("")
+        if axis_name =='y-acceleration':
+            figure_axs.set_ylabel('Acceleration [m/s^2]')
+        elif axis_name == 'z-acceleration':
+            figure_axs.set_xlabel('Frequency [Hz]')
+
+    plt.show()
+    if saving_choice:
+        path = save_path + ' fft_analysis.png'
+        fig.savefig(path)
+
+
+def CSV_export(accelerometer_dataframe, save_path):
+    #stat_analysis = accelerometer_dataframe.describe(percentiles=[]).drop(columns=['timestamp'])  # Statistical analysis of the data
+    stat_analysis = accelerometer_dataframe.drop(columns=['timestamp', 'sensor_id']).describe(percentiles=[])  # Statistical analysis of the data
+    stat_analysis.to_csv(save_path + ' stat analysis.csv', mode='w', index=True,header=True)  # CSV file with statistical analysis
+    accelerometer_dataframe.to_csv(save_path + ' data.csv', mode='w', index=True,header=True)  # CSV file with raw readings
+
+
+
+
