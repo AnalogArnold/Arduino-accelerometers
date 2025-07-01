@@ -4,7 +4,7 @@ import pandas as pd
 import dearpygui.dearpygui as dpg
 import tkinter.filedialog
 from collections import defaultdict
-from processAccelerometerData import main_processing_function # Import functions used for visualising the data depending on the needs
+from process_accelerometer_data import main_processing_function # Import functions used for visualising the data depending on the needs
 
 # 0. Set-up before running the main code.
 # Global variables
