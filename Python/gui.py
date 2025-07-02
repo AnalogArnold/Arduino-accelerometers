@@ -170,9 +170,9 @@ class AccelerometerReaderGUI:
 
         # Change the default font to a bigger and more legible one
         with dpg.font_registry():
-            default_font = dpg.add_font("Fonts/SFPRODISPLAYREGULAR.OTF", 18)  # Default font
-            header_font = dpg.add_font("Fonts/SFPRODISPLAYBOLD.OTF", 30)  # Font for the header
-            child_header_font = dpg.add_font("Fonts/SFPRODISPLAYMEDIUM.OTF", 20)  # Font for the table headers
+            default_font = dpg.add_font("fonts/SFPRODISPLAYREGULAR.OTF", 18)  # Default font
+            header_font = dpg.add_font("fonts/SFPRODISPLAYBOLD.OTF", 30)  # Font for the header
+            child_header_font = dpg.add_font("fonts/SFPRODISPLAYMEDIUM.OTF", 20)  # Font for the table headers
 
         # Bind the theme to the GUI
         dpg.bind_theme(global_theme)
