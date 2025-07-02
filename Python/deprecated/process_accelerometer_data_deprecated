@@ -1,3 +1,15 @@
+##################################################################################################################
+#
+# The first version of the function processing the accelerometer data which was called by app_deprecated.
+# It has been rewritten as a class and the plots have been improved.
+#
+# Version: 1.0 (June 2025)
+# Author: Michael Darcy
+# License: MIT
+# Copyright (C) 2025 AnalogArnold
+#
+##################################################################################################################
+
 import matplotlib.pyplot as plt
 import smplotlib
 import numpy as np
