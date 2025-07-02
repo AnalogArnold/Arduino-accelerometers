@@ -1,3 +1,17 @@
+##################################################################################################################
+#
+# Full code doing everything: displaying the GUI, acting as the TCP client, and using the data processing functions.
+# It is messy and served only as a proof of concept for me to see if I could make any of this at all.
+# It has been refractored and hence, this version is deprecated - I am keeping it for educational purposes only.
+#
+# Version: 1.0 (June 2025)
+# Author: Michael Darcy
+# License: MIT
+# Copyright (C) 2025 AnalogArnold
+#
+##################################################################################################################
+
+
 import socket
 import threading
 import pandas as pd
