@@ -82,7 +82,7 @@ class DataProcessor:
         filepath_analysis = self._create_save_file_path(suffix)
         stat_analysis = self.single_sensor_data.drop(columns=['timestamp', 'sensor_id']).describe(percentiles=[])
         stat_analysis.to_csv(filepath_analysis, mode="w", index=True, header=True) # CSV file with statistical analysis
-        self.single_sensor_data.to_csv(filepath_data, mode="w", index=True, header=False) # CSV file with raw readings
+        self.single_sensor_data.to_csv(filepath_data, mode="w", index=True, header=True) # CSV file with raw readings
 
     def _acceleration_vs_time(self):
         """Plots acceleration vs. time for all axes."""
