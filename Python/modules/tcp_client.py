@@ -181,10 +181,12 @@ class TCPClient:
 
     def update_sensor_parameters(self, param_type):
         """Updates the sensor parameters (datarate, range) on the board and updates related values in the GUI."""
+        new_value = None
         if param_type == "SET_DATARATE":
             value = dpg.get_value("datarate_choice")
             # If user selects different datarate than the default value set in the board set-up/what is already set:
             if value != self.data_manager.params[0]:
+                print(value != self.data_manager.params[0])
                 new_value = value.split()[0]
                 # Check and, if needed, pause data recording first if the user wants to change the recording parameters.
                 if not self.stop_event.is_set():
@@ -213,8 +215,9 @@ class TCPClient:
                 param = "sensor range"
                 dpg.set_value("status", f"New sensor range was set to: {str(new_value)} G")
                 self.data_manager.params[1] = value
-        # Communicate the new datarate to change it in the hardware
-        message_to_server = (new_value + '\n').encode()
-        self.socket.sendall(message_to_server)
-        # Update the status bar
-        dpg.set_value("status", f"New {param} was set to: {str(new_value)}")
+        # Communicate the new setting to change it in the hardware
+        if new_value is not None:
+            message_to_server = (new_value + '\n').encode()
+            self.socket.sendall(message_to_server)
+            # Update the status bar
+            dpg.set_value("status", f"New {param} was set to: {str(new_value)}")
