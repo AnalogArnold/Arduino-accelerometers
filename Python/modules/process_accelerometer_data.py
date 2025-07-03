@@ -78,7 +78,7 @@ class DataProcessor:
     def _export_csv(self):
         """Outputs one CSV with raw data and one with descriptive statistics."""
         suffix = "stat analysis.csv"
-        filepath_data = self._create_save_file_path("data")
+        filepath_data = self._create_save_file_path("data.csv")
         filepath_analysis = self._create_save_file_path(suffix)
         stat_analysis = self.single_sensor_data.drop(columns=['timestamp', 'sensor_id']).describe(percentiles=[])
         stat_analysis.to_csv(filepath_analysis, mode="w", index=True, header=True) # CSV file with statistical analysis
