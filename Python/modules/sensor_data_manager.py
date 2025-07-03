@@ -14,7 +14,7 @@
 from collections import defaultdict
 import dearpygui.dearpygui as dpg
 import pandas as pd
-from process_accelerometer_data import DataProcessor
+from .process_accelerometer_data import DataProcessor
 
 
 class SensorDataManager:
