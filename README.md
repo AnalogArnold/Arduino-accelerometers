@@ -110,9 +110,9 @@ One major limitation is the **inability to use the full potential of the Adafrui
 ## Known limitations (to be fixed)
 1. The application freezes if the "connect" button is pressed, but the client PC is not connected to the server's network.
 2. Plots are currently displayed in the Python IDE, not as part of the GUI.
-3. Matplotlib is a major bottleneck and takes a solid couple of seconds to return the figures, so generating the figures right after the acquisition, especially with all 8 sensors connected, might not be practical if there are time restraints. However, this is currently the only option.
-  * **Version 2.1 (08/07/2025) update:** There is now an option to plot data in real-time using DearPyGUI's built-in functions, which are much faster.
-4. If the client connects to the server and changes the hardware setting (e.g., datarate), then exits and connects again, the sensors will still be in the "updated" state, whereas the app will assume the default settings, leading to a mismatch between the expected and actual intervals, and range cannot be verified.
+   * **v2.1:** Real-time plots are now displayed as a part of the GUI.
+4. Matplotlib is a major bottleneck and takes a solid couple of seconds to return the figures, so generating the figures right after the acquisition, especially with all 8 sensors connected, might not be practical if there are time restraints. However, this is currently the only option.
+5. If the client connects to the server and changes the hardware setting (e.g., datarate), then exits and connects again, the sensors will still be in the "updated" state, whereas the app will assume the default settings, leading to a mismatch between the expected and actual intervals, and range cannot be verified.
    * Current progress: Wrote a function sending a command to the server to reset the sensors to the default settings, but it does not want to work on closing the GUI window, even though it worked well when used as a test button callback.
    * Current workaround: The script compares the expected interval between the readings (based on the datarate value in the window) and the actual interval. If it is greater than 10 ms (although in reality, no difference greater than 2 ms has been observed), it displays a warning to the user, prompting them to adjust the datarate in the GUI to fix this mismatch (which works).
 ![datarate mismatch warning](/Images/warning_datarate.png)
@@ -120,11 +120,14 @@ One major limitation is the **inability to use the full potential of the Adafrui
 
 ## Nice-to-have features (may be added)
 1. Separation of the data processing:
-   * Live data/quick rough plotting after pausing the recording in a separate GUI window.
+   * ~~Live data/quick rough plotting after pausing the recording in a separate GUI window.~~
    * Separate tab for opening and processing already saved CSV files in matplotlib for high-quality figures that can be created separately from data acquisition.
 2. Autosizing based on the detected screen size instead of using hardcoded sizes in pixels.
 3. Cosmetic improvements such as centering the buttons (currently require a lot of manual tinkering in dearpygui such as creating a table).
 4. Check for the sensor network availability constantly (potentially a separate thread) rather than just on initialization or when "connect" is pressed.
+
+# Updates
+* **Version 2.1 (08/07/2025) update:** There is now an option to plot data in real-time using DearPyGUI's built-in functions, which are much faster.
 
 # License
 MIT License
