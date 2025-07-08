@@ -62,9 +62,6 @@ The schematic of the set-up, including the specific hardware used:
 3. **Sensor detection:** Automatically updates the list of detected sensors and the options in the data processing window every time the "Start recording" button is pressed.
    ![view of the processing window](/Images/processing_options.png)
 
-4. **Clear data function:** Allows the user to clear the data (mostly for aesthetic purposes or switching between the experimental set-ups; this also happens when the recording is started).
-  ![showcase of the clear data function](/Images/demo_clear_data.gif)
-
 # Requirements
 ## Python
   (Or at least the versions I used while coding it and I cannot guarantee compatibility otherwise)
