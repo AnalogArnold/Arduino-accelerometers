@@ -21,6 +21,7 @@ The schematic of the set-up, including the specific hardware used:
     ![GUI view](/Images/gui_view.png)
 * **Data processing and export:** Allows for processing of incoming sensor data and immediately processing the results, giving the user multiple output options (see below).
 * **Live data plotting:** Supports real-time plotting of sensor data within the Python environment for immediate feedback during acquisition.
+   ![live data plotting demo](/Images/demo_live_plotting.gif)
 * **Interval mismatch warning:** Automatically compares the expected (based on the sensor data rate) and actual data intervals, warning the user if discrepancies are detected and suggesting corrective actions.
 * **No existing Wi-Fi needed:** The board has its own network, so if you cannot connect it to an existing Wi-Fi for any reason, this is not an issue.
 
