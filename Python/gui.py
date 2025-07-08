@@ -3,8 +3,9 @@
 # Class AccelerometerReaderGUI creates a simple graphical user interface to enable the user to easily communicate with
 # the Adafruit board and process the data without having to look at the code. It contains all theme information and
 # uses TCPClient class to establish a connection with the board, and the SensorDataManager class to process the data.
+# Version 2.1 also adds the ability to plot the acceleration vs time in real time.
 #
-# Version: 2.0 (July 2025)
+# Version: 2.1 (July 2025)
 # Author: Michael Darcy
 # License: MIT
 # Copyright (C) 2025 AnalogArnold
@@ -12,9 +13,13 @@
 ##################################################################################################################
 
 import tkinter.filedialog
+import threading
 import dearpygui.dearpygui as dpg
+import time
+from math import ceil
 from modules.sensor_data_manager import SensorDataManager
 from modules.tcp_client import TCPClient
+from itertools import zip_longest
 
 
 class AccelerometerReaderGUI:
@@ -22,13 +27,16 @@ class AccelerometerReaderGUI:
         self.data_manager = SensorDataManager()
         self.tcp_client = TCPClient(self.data_manager)
         self.directory_path = None
+        self.stop_plot_event = threading.Event()
+        self.stop_plot_event.set()
+        self.live_plotting_thread = None
         # Set-up gui upon initialization
         self.setup_gui()
 
     def setup_gui(self):
         """Sets up the GUI for the accelerometer reader."""
         dpg.create_context()
-        dpg.create_viewport(title='Accelerometer controller', width=1100, height=800)
+        dpg.create_viewport(title='Accelerometer controller', width=1300, height=800)
         self._create_main_window()
         self._setup_theme()
         dpg.set_primary_window("accelerometer_control", True)
@@ -70,6 +78,7 @@ class AccelerometerReaderGUI:
                 dpg.add_button(label="Start recording", callback=lambda: self._command_callback(None, "START"))
                 dpg.add_button(label="Stop recording", callback=lambda: self._command_callback(None, "STOP"))
                 dpg.add_button(label="Process data", callback=self._show_processing_window)
+                dpg.add_button(label="Show live data", callback=self._show_live_plot_window)
                 dpg.add_button(label="Clear data", callback=self._clear_data_callback)
 
             # Data display
@@ -220,7 +229,7 @@ class AccelerometerReaderGUI:
     def _show_processing_window(self):
         """Displays and handles the window with data processing options."""
         with dpg.window(label="Processing Options", tag="processing_window",
-                        autosize=True, pos=[250, 150], on_close=self._close_processing_window):
+                        autosize=True, pos=[250, 150], on_close=self._close_window("processing_window")):
             sensors_list = list(self.data_manager.active_sensors)
             sensors_list.append('All')
             # Horizontal group and text instead of a label because labels are to the right and it cannot be easily
@@ -243,14 +252,12 @@ class AccelerometerReaderGUI:
             dpg.add_text("Saving status: Save OFF", tag="save_status_log")
             dpg.add_button(label="Run processing", callback=self._processing_callback)
 
-    def _close_processing_window(self) :
-        """Callback for the close button of the processing window. Deletes all items from the processing window to
-        avoid DPG's 'alias already exists' error when the window is closed and reopened."""
-        for item in ["processing_window", "directory_dialog","processing_choice", "interval_choice",
-                     "save_status_log", "chosen_directory_log", "sensor_choice"]:
-            dpg.delete_item(item)
-
     def _processing_callback(self):
+        if dpg.get_value("processing_choice") == "CSV export" and self.directory_path is None:
+            with dpg.window(tag="processing_warning_popup", modal=True, no_title_bar=True, width=400):
+                dpg.add_text("Warning! You haven't selected a directory to save the CSV file. The processing will return nothing.", wrap=390)
+                dpg.add_button(label="OK", callback=lambda: dpg.delete_item("processing_warning_popup"))
+                return
         self.data_manager.process_dataframe(self.directory_path)
 
     def _directory_select_callback(self):
@@ -261,6 +268,93 @@ class AccelerometerReaderGUI:
             self.directory_path = filepath + "/Processed data"
             dpg.set_value("chosen_directory_log", f"{self.directory_path}")
             dpg.set_value("save_status_log", "Saving status: Save ON")
+
+    def _show_live_plot_window(self):
+        """Displays and handles the window processing the data in real time."""
+        with dpg.window(label="Live data", tag="live_plot_window", autosize=True, pos=[500, 0],
+                        on_close=lambda:self._close_window("live_plot_window")):
+            # Stack the plots together in 2 columns and number of rows dependent on the number of active sensors
+            # Check if there is any data to plot (if there are sensors detected, it should not be)
+            if bool(self.data_manager.active_sensors):
+                # Create a group to display the subplots in 2 groups.
+                subplot_tags = [] # Store existing subplot cell tags for the subplots
+                number_of_rows = ceil(len(self.data_manager.active_sensors)/2) # Number of rows with 2 plots per row
+                with dpg.group(tag="live_subplots"):
+                    for i in range(number_of_rows):
+                        with dpg.group(horizontal=True):
+
+                            for sensor_id in list(self.data_manager.active_sensors)[i::number_of_rows]:
+                            # Create subplots and their tags, so they can be updated rather than re-created
+                                subplot_tag = f"{sensor_id}_subplot"
+                                dpg.add_subplots(3,1,tag=subplot_tag, height=350, width=350)
+                                subplot_tags.append(subplot_tag)
+                # Start the live plotting thread
+                if self.live_plotting_thread is None:
+                    self.live_plotting_thread = threading.Thread(target=self._plot_live_data,
+                                                                 args=[subplot_tags], daemon=True)
+                    self.live_plotting_thread.start()
+                self.stop_plot_event.clear()
+            else:
+                dpg.add_text("Nothing to plot.")
+
+            #dpg.add_button(label="update", callback=lambda:self._plot_live_data_update())
+
+    def _close_window(self, window_name):
+        """Callback for the close button of data-related windows (live plotting and data processing). Deletes the window
+        and its children (contents; default in delete_item) to avoid DPG's 'alias already exists' error when the window
+        is closed and reopened."""
+        if window_name == "live_plot_window":
+            self.stop_plot_event.set()
+        dpg.delete_item(window_name)
+
+    def _plot_live_data(self, subplot_tags):
+        """Plots the real-time acceleration vs time data for all detected sensors."""
+        labels = ["x-acceleration", "y-acceleration", "z-acceleration"]
+        while True:
+            try:
+             # Plot only if the event flag is not set and the window exists (to prevent dpg crashes)
+                if dpg.does_alias_exist("live_plot_window"):
+                    if not self.stop_plot_event.is_set():
+                            for subplot_tag in subplot_tags:
+                                sensor_id = int(subplot_tag.split("_")[0])
+                                # Create tags for every x- and y-axis to keep the aliases separate
+                                x_tags = [f"x_axis_{i}_s_{sensor_id}" for i in range(1,4)]
+                                y_tags = [f"y_axis_{i}_s_{sensor_id}" for i in range(1,4)]
+                                # Plot in 3 vertical subplots for every sensor
+                                for label, x_tag, y_tag in zip(labels, x_tags, y_tags):
+                                    self._create_plot_on_subplot(sensor_id, label, x_tag, y_tag, subplot_tag)
+                                time.sleep(0.05) # Slight delay to give time to fetch the data
+                            # Pause plotting is the recording is paused too
+                            if self.tcp_client.stop_event.is_set():
+                                self.stop_plot_event.set()
+                    # If recording is restarted, re-open the window (to reset the data, mostly if more/less sensors have
+                    # been connected. Then start plotting
+                    elif not self.tcp_client.stop_event.is_set() and self.stop_plot_event.is_set():
+                        self._close_window("live_plot_window")
+                        time.sleep(0.5) # Short delay to fetch enough data to initialize all subplots
+                        self._show_live_plot_window()
+            except:
+                pass # Exceptions are usually from issues with dpg aliases, which sort themselves out, so we can pass
+
+    def _create_plot_on_subplot(self, sensor_id, label, x_tag, y_tag, subplot_tag):
+        """Either creates individual plots on a subplot or adds values and re-adjusts the axes on existing ones."""
+        plot_tag = f"plot_s_{sensor_id}_{label}"
+        x_time = self.data_manager.data[sensor_id]["normalized_timestamp"]
+        y_data = self.data_manager.data[sensor_id][label]
+        if not dpg.does_item_exist(plot_tag):
+            with dpg.plot(parent=subplot_tag):
+                dpg.add_plot_axis(dpg.mvXAxis, label="Time [s]", no_gridlines=True, tag=x_tag)
+                dpg.add_plot_axis(dpg.mvYAxis, label=label, no_gridlines=True, tag=y_tag)
+                dpg.add_line_series(x_time, y_data, parent=y_tag, tag=plot_tag)  # Plot
+                # Remove the ticks and labels from the upper x-axes since they're shared
+                if label != "z-acceleration":
+                    dpg.configure_item(x_tag, no_tick_marks=True, no_tick_labels=True, label="")
+        else:
+            dpg.fit_axis_data(x_tag)
+            dpg.fit_axis_data(y_tag)
+            dpg.configure_item(plot_tag, x=x_time, y=y_data)
+
+
 
     def _clear_data_callback(self):
         """Clears the values of the variables but without disconnecting, i.e., the TCP data is stored."""
@@ -274,6 +368,3 @@ class AccelerometerReaderGUI:
     def run(self):
         dpg.start_dearpygui()
         dpg.destroy_context()
-
-
-
