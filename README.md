@@ -124,7 +124,7 @@ One major limitation is the **inability to use the full potential of the Adafrui
 4. Check for the sensor network availability constantly (potentially a separate thread) rather than just on initialization or when "connect" is pressed.
 
 # Updates
-* **Version 2.1 (08/07/2025) update:** There is now an option to plot data in real-time using DearPyGUI's built-in functions, which are much faster.
+* **Version 2.1 (08/07/2025):** There is now an option to plot data in real time using DearPyGUI's built-in functions, which are much faster.
 
 # License
 MIT License
