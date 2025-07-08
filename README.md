@@ -20,6 +20,7 @@ The schematic of the set-up, including the specific hardware used:
 * **Python client GUI:** Provides a simple graphical user interface (GUI) for controlling data acquisition, adjusting sensor settings, and visualizing results. The user does not need to be familiar with Arduino IDE (C++) or Python to be able to use it.
     ![GUI view](/Images/gui_view.png)
 * **Data processing and export:** Allows for processing of incoming sensor data and immediately processing the results, giving the user multiple output options (see below).
+* **Live data plotting:** Supports real-time plotting of sensor data within the Python environment for immediate feedback during acquisition.
 * **Interval mismatch warning:** Automatically compares the expected (based on the sensor data rate) and actual data intervals, warning the user if discrepancies are detected and suggesting corrective actions.
 * **No existing Wi-Fi needed:** The board has its own network, so if you cannot connect it to an existing Wi-Fi for any reason, this is not an issue.
 
@@ -109,6 +110,7 @@ One major limitation is the **inability to use the full potential of the Adafrui
 1. The application freezes if the "connect" button is pressed, but the client PC is not connected to the server's network.
 2. Plots are currently displayed in the Python IDE, not as part of the GUI.
 3. Matplotlib is a major bottleneck and takes a solid couple of seconds to return the figures, so generating the figures right after the acquisition, especially with all 8 sensors connected, might not be practical if there are time restraints. However, this is currently the only option.
+  * **Version 2.1 (08/07/2025) update:** There is now an option to plot data in real-time using DearPyGUI's built-in functions, which are much faster.
 4. If the client connects to the server and changes the hardware setting (e.g., datarate), then exits and connects again, the sensors will still be in the "updated" state, whereas the app will assume the default settings, leading to a mismatch between the expected and actual intervals, and range cannot be verified.
    * Current progress: Wrote a function sending a command to the server to reset the sensors to the default settings, but it does not want to work on closing the GUI window, even though it worked well when used as a test button callback.
    * Current workaround: The script compares the expected interval between the readings (based on the datarate value in the window) and the actual interval. If it is greater than 10 ms (although in reality, no difference greater than 2 ms has been observed), it displays a warning to the user, prompting them to adjust the datarate in the GUI to fix this mismatch (which works).
