@@ -5,7 +5,7 @@
 # stop, or adjusting the hardware settings without having to do it directly from the Arduino IDE. It then feeds the
 # data to the SensorDataManager class for further processing.
 #
-# Version: 2.0 (July 2025)
+# Version: 2.2 (July 2025)
 # Author: Michael Darcy
 # License: MIT
 # Copyright (C) 2025 AnalogArnold
@@ -16,7 +16,7 @@ import socket
 import subprocess
 import threading
 import dearpygui.dearpygui as dpg
-
+import time
 
 class TCPClient:
     """ Handles the connection and communication with the ESP32 server using TCP/IP protocol."""
@@ -40,12 +40,10 @@ class TCPClient:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self.socket.connect((host, port))
             self.stop_event.set() # Start the program in a stopped state.
-            self.receiver_thread = threading.Thread(
-                target=self._receive_data,
-                daemon=True
-            )
+            self.receiver_thread = threading.Thread(target=self._receive_data, daemon=True)
             self.receiver_thread.start()
             self.connected = True
+
             return True
         except Exception as e:
             dpg.set_value("status", f"Connection failed: {str(e)}")
@@ -126,10 +124,9 @@ class TCPClient:
             timestamps = self.data_manager.data[reference_sensor_id]["timestamp"]
             if len(timestamps) >= 2 and not self.data_manager.params[3]:
                 # Calculate the interval
-                interval = (timestamps[-1] - timestamps[-2]) * 1000
+                interval = (timestamps[-1] - timestamps[-2]) * 1000 # Convert to ms to keep consistent with the rest...
                 self.data_manager.params[3] = round(interval)
-                dpg.set_value("actual_interval_info",
-                              f"Actual interval: {self.data_manager.params[3]} ms")
+                dpg.set_value("actual_interval_info", self.data_manager.params[3])
                 self._check_for_interval_mismatch()
 
     def _check_for_interval_mismatch(self):
@@ -186,13 +183,12 @@ class TCPClient:
             value = dpg.get_value("datarate_choice")
             # If user selects different datarate than the default value set in the board set-up/what is already set:
             if value != self.data_manager.params[0]:
-                print(value != self.data_manager.params[0])
                 new_value = value.split()[0]
                 # Check and, if needed, pause data recording first if the user wants to change the recording parameters.
                 if not self.stop_event.is_set():
                     self.stop_recording()
                     dpg.set_value("status", "Recording was stopped to initialize the new datarate.")
-                    dpg.set_value("actual_interval_info", "Actual Interval: ---- ms")
+                    dpg.set_value("actual_interval_info", "")
                     self.data_manager.params[3] = ""
                 param = "sensor datarate"
                 # Store the new datarate so that we don't overwrite the value if the user just clicks on the drop-down
@@ -201,8 +197,7 @@ class TCPClient:
                 # Update the expected interval value for the new selected datarate
                 expected_interval = int(1 / int(self.data_manager.params[0].split()[0]) * 1000)
                 self.data_manager.params[2] = expected_interval
-                dpg.set_value("expected_interval_info",
-                              f"Expected intervals between readings: {str(expected_interval)} ms")
+                dpg.set_value("expected_interval_info", expected_interval)
         elif param_type == "SET_RANGE":
             value = dpg.get_value("range_choice")
             if value != self.data_manager.params[1]:
