@@ -4,7 +4,7 @@
 # It can plot the acceleration vs time, magnitude and rms over time, and the Fast Fourier transform. It can also
 # generate a CSV file with raw data and a CSV file with statistical analysis.
 #
-# Version: 2.0 (July 2025)
+# Version: 2.2 (July 2025)
 # Author: Michael Darcy
 # License: MIT
 # Copyright (C) 2025 AnalogArnold
@@ -13,6 +13,7 @@
 
 from os import path, mkdir
 import matplotlib.pyplot as plt
+import smplotlib
 import numpy as np
 from scipy.fft import rfft, rfftfreq
 from scipy.signal import windows
@@ -23,7 +24,6 @@ class DataProcessor:
         # Constants
         self.AXIS_NAMES = ["x-acceleration", "y-acceleration", "z-acceleration"]
         self.COLORS = ["#58508d", "#bc5090", "#ff6361"] # Colors for x (and magnitude), y, z plots
-        self.RMS_COLOR = "#003f5c"
         self.FONT_SIZES = {"suptitle": 25, "subtitle": 20, "axis_labels": 22}
         self.FIGURE_SIZE = (12, 10)
         self.SUBPLOT_SPACING = 0.3 # hspace between subplots
@@ -133,8 +133,8 @@ class DataProcessor:
         mag_ax.grid()
         # Plot RMS on the same figure and give it separate y-axis on the right
         rms_ax = mag_ax.twinx()
-        rms_ax.plot(self.timestamp, rms_xs, color=self.RMS_COLOR, label="RMS")
-        rms_ax.set_ylabel("RMS acceleration [m/s^2]")
+        rms_ax.plot(self.timestamp, rms_xs, color=self.COLORS[1], label="RMS")
+        rms_ax.set_ylabel("RMS acceleration [m/s^2]", fontsize=self.FONT_SIZES["axis_labels"])
         # Change the axis color so it is easy to associate with RMS
         rms_ax.tick_params(axis="y", labelcolor=self.COLORS[1])
         # Combine legends from both axes
