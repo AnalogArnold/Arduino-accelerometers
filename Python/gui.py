@@ -5,7 +5,7 @@
 # uses TCPClient class to establish a connection with the board, and the SensorDataManager class to process the data.
 # It also contains a few utility functions to plot the real-time data using the GUI engine.
 #
-# Version: 2.2 (July 2025)
+# Version: 2.3 (July 2025)
 # Author: Michael Darcy
 # License: MIT
 # Copyright (C) 2025 AnalogArnold
@@ -43,6 +43,7 @@ class AccelerometerReaderGUI:
         self._setup_theme()
         dpg.set_primary_window("accelerometer_control", True)
         dpg.setup_dearpygui()
+        dpg.set_exit_callback(callback=lambda: self.tcp_client.reset_sensors()) # NEW, to be tested
         dpg.show_viewport()
         # Check network connection before the user does anything else
         self.tcp_client.get_current_network()
@@ -71,6 +72,7 @@ class AccelerometerReaderGUI:
                                   default_value="2 G", tag="range_choice", width=55,
                                   callback=lambda: self._command_callback(None, "SET_RANGE"))
                     dpg.add_button(label="Connect", tag="connect_button", callback=self._connect_callback)
+                    dpg.add_button(label="Disconnect", tag="disconnect_button", callback=self._disconnect_callback)
                 with dpg.group(horizontal=True):
                     dpg.add_text("Connection status: Not connected", tag="connection_status")
                     dpg.add_text("", tag="connection_warning",  color=(178, 34, 34), wrap=600, indent=240)
@@ -90,6 +92,7 @@ class AccelerometerReaderGUI:
         """Creates the contents of the data acquisition tab."""
         with dpg.group(parent="data_acquisition_tab"):
             dpg.add_text("Data acquisition from the sensors", tag="data_log_header")
+            # Control buttons on the menu bar
             # Control buttons on the menu bar
             with dpg.group(horizontal=True):
                 dpg.add_button(label="Start recording", callback=lambda: self._command_callback(None, "START"))
@@ -252,11 +255,16 @@ class AccelerometerReaderGUI:
                         var, x_val, y_val = style_var
                         dpg.add_theme_style(var, x_val, y_val, category=dpg.mvThemeCat_Core)
 
-        # Define the item theme to make the connect button stand out more
+        # Define the item theme to make the connect/disconnect buttons stand out more
         with dpg.theme() as item_theme_connect:
             with dpg.theme_component(dpg.mvAll):
                 dpg.add_theme_color(dpg.mvThemeCol_Button, (146, 209, 161), category=dpg.mvThemeCat_Core)
                 dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (123, 198, 140), category=dpg.mvThemeCat_Core)
+
+        with dpg.theme() as item_theme_disconnect:
+            with dpg.theme_component(dpg.mvAll):
+                dpg.add_theme_color(dpg.mvThemeCol_Button, (219, 98, 77), category=dpg.mvThemeCat_Core)
+                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (190, 90, 72), category=dpg.mvThemeCat_Core)
 
         # Change the default font to a bigger and more legible one
         with dpg.font_registry():
@@ -273,6 +281,7 @@ class AccelerometerReaderGUI:
         dpg.bind_item_font("status_header", child_header_font)
         dpg.bind_item_font("detected_sensors_header", child_header_font)
         dpg.bind_item_theme("connect_button", item_theme_connect)
+        dpg.bind_item_theme("disconnect_button", item_theme_disconnect)
 
     def _connect_callback(self):
         """GUI callback calling the TCP class to establish the local connection with the Adafruit board."""
@@ -282,10 +291,14 @@ class AccelerometerReaderGUI:
         if self.tcp_client.connect(host, port):
             dpg.set_value("status", "Connected successfully!")
             dpg.set_value("connection_status", "Connection status: Connected")
-            dpg.delete_item("connect_button")
             dpg.set_value("connection_warning", "")
         else:
             dpg.set_value("status", "Cannot connect.")
+
+    def _disconnect_callback(self):
+        """GUI callback calling the TCP class to disconnect from the Adafruit board."""
+        if self.tcp_client.disconnect():
+            dpg.set_value("status", "Disconnected successfully!")
 
     def _command_callback(self, sender, command):
         """Guides the app and Adafruit behavior depending on the command selected by the user from the menu bar."""
