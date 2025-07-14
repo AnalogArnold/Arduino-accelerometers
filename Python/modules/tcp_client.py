@@ -5,7 +5,7 @@
 # stop, or adjusting the hardware settings without having to do it directly from the Arduino IDE. It then feeds the
 # data to the SensorDataManager class for further processing.
 #
-# Version: 2.2 (July 2025)
+# Version: Version: 2.3 (July 2025)
 # Author: Michael Darcy
 # License: MIT
 # Copyright (C) 2025 AnalogArnold
@@ -16,7 +16,6 @@ import socket
 import subprocess
 import threading
 import dearpygui.dearpygui as dpg
-import time
 
 class TCPClient:
     """ Handles the connection and communication with the ESP32 server using TCP/IP protocol."""
@@ -33,21 +32,36 @@ class TCPClient:
     def connect(self, host, port):
         """Establishes connection with the Arduino (EP32) server.
             Starts a thread to receive data continuously from the EP32 without blocking the main program (so the rest of
-            the code can keep on running). We set this thread as a daemon thread i.e., such that will automatically
-            terminate when the main program terminates. Used for threads providing background services,
-            like receiving data continuously."""
+            the code can keep on running). It also contains a 4 s timeout in case a connection cannot be established or
+            it suddenly stops receiving data (e.g., Arduino resets mid-recording),  so the program does not freeze. We
+            set this thread as a daemon thread i.e., such that will automatically terminate when the main program
+            ends. Used for threads providing background services, like receiving data continuously."""
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            # Set timeout to 4 seconds so the program doesn't get stuck.
+            self.socket.settimeout(2)
             self.socket.connect((host, port))
             self.stop_event.set() # Start the program in a stopped state.
             self.receiver_thread = threading.Thread(target=self._receive_data, daemon=True)
             self.receiver_thread.start()
             self.connected = True
-
             return True
         except Exception as e:
             dpg.set_value("status", f"Connection failed: {str(e)}")
             return False
+
+    def disconnect(self):
+        if self.connected:
+            self.socket.close()
+            self.socket.shutdown(socket.SHUT_RDWR)
+            self.stop_event.set()
+            self.socket = None
+            self.connected = False
+            self.receiver_thread.join()
+            self.receiver_thread = None
+            dpg.set_value("connection_status", "Connection status: Disconnected")
+            return True
+        return False
 
     def _receive_data(self):
         """Receives data continously from the ESP32 without blocking the main program."""
@@ -65,8 +79,13 @@ class TCPClient:
                         self.data_manager.process_line(line.strip())
                         self._update_gui_table(line)
                         self._update_actual_interval()
-            except (ConnectionResetError, BrokenPipeError):
-                print("Connection lost")
+            except (ConnectionResetError, BrokenPipeError, ConnectionAbortedError) as e:
+                dpg.set_value("status", "Connection lost.")
+                self.disconnect()
+                break
+            except TimeoutError as e:
+                dpg.set_value("status", "Connection timed out. Check the hardware.")
+                self.disconnect()
                 break
 
     def get_current_network(self):
@@ -157,11 +176,9 @@ class TCPClient:
             self.socket.close()
             self.connected = False
 
-    def _reset_sensors(self):
-        """CURRENTLY IN PROGRESS. It is meant to reset the sensors when the app closes so there is never a mismatch
-        between the datarates stemming from that. However, while this function works (tested with a button), it does not
-        activate when used in the on_click parameter of the primary window of the GUI. That's food for thought for me.
-        Resets the sensor settings both in the hardware and in the GUI."""
+    def reset_sensors(self):
+        """Reset the sensors when the app closes so the hardware parameters are reset to default set in the GUI to
+        prevent the mismatch if e.g., the app is restarted."""
         if self.data_manager.params[0] != "1 Hz":
             print("I have been activated")
             dpg.set_value("datarate_choice", self.data_manager.default_params["datarate"])
