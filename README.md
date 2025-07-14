@@ -18,7 +18,7 @@ The schematic of the set-up, including the specific hardware used:
 * **Multi-sensor support:** Designed to handle data from up to 8 accelerometers simultaneously, making it suitable for complex sensor networks.
 * **TCP/IP communication:** Utilizes TCP/IP protocol for robust and reliable data transfer between the Arduino server and Python client. There is a buffer implemented to ensure a smooth transition and no data loss.
 * **Python client GUI:** Provides a simple graphical user interface (GUI) for controlling data acquisition, adjusting sensor settings, and visualizing results. The user does not need to be familiar with Arduino IDE (C++) or Python to be able to use it.
-    ![GUI view](/Images/gui_view.png)
+    ![GUI view](/Images/gui_view_2.3.png)
 * **Data processing and export:** Allows for processing of incoming sensor data and immediately processing the results, giving the user multiple output options (see below).
 * **Live data plotting:** Supports real-time plotting of sensor data within the Python environment for immediate feedback during acquisition.
    ![live data plotting demo](/Images/demo_live_plotting.gif)
@@ -60,7 +60,8 @@ The schematic of the set-up, including the specific hardware used:
   ![showcase of the adjustability of sensor parameters](/Images/demo_toggling_sensor_params.gif)
 
 3. **Sensor detection:** Automatically updates the list of detected sensors and the options in the data processing window every time the "Start recording" button is pressed.
-   ![view of the processing window](/Images/processing_options.png)
+   
+   ![view of the processing window](/Images/processing_options_2.3.png)
 
 # Requirements
 ## Python
