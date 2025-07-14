@@ -4,7 +4,7 @@
 # It can plot the acceleration vs time, magnitude and rms over time, and the Fast Fourier transform. It can also
 # generate a CSV file with raw data and a CSV file with statistical analysis.
 #
-# Version: 2.2 (July 2025)
+# Version: Version: 2.3 (July 2025)
 # Author: Michael Darcy
 # License: MIT
 # Copyright (C) 2025 AnalogArnold
