@@ -3,7 +3,7 @@
 # Class SensorDataManager stores the sensor readings and processes them. It also passes the detected sensors to the
 # GUI and the data to the DataProcessor for plotting and/or saving.
 #
-# Version: 2.2 (July 2025)
+# Version: Version: 2.3 (July 2025)
 # Author: Michael Darcy
 # License: MIT
 # Copyright (C) 2025 AnalogArnold
