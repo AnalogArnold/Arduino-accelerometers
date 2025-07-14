@@ -16,6 +16,7 @@ import socket
 import subprocess
 import threading
 import dearpygui.dearpygui as dpg
+import time
 
 class TCPClient:
     """ Handles the connection and communication with the ESP32 server using TCP/IP protocol."""
@@ -32,15 +33,16 @@ class TCPClient:
     def connect(self, host, port):
         """Establishes connection with the Arduino (EP32) server.
             Starts a thread to receive data continuously from the EP32 without blocking the main program (so the rest of
-            the code can keep on running). It also contains a 4 s timeout in case a connection cannot be established or
+            the code can keep on running). It also contains a 2 s timeout in case a connection cannot be established or
             it suddenly stops receiving data (e.g., Arduino resets mid-recording),  so the program does not freeze. We
             set this thread as a daemon thread i.e., such that will automatically terminate when the main program
             ends. Used for threads providing background services, like receiving data continuously."""
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            # Set timeout to 4 seconds so the program doesn't get stuck.
+            # Set timeout to 2 seconds so the program doesn't get stuck.
             self.socket.settimeout(2)
             self.socket.connect((host, port))
+            self.socket.settimeout(None)
             self.stop_event.set() # Start the program in a stopped state.
             self.receiver_thread = threading.Thread(target=self._receive_data, daemon=True)
             self.receiver_thread.start()
@@ -70,9 +72,6 @@ class TCPClient:
             try:
                 if not self.stop_event.is_set():
                     data = self.socket.recv(self.BUFFER_SIZE).decode()
-                    if not data:
-                        print("Connection closed by server")
-                        break
                     self.data_manager.buffer += data
                     # Process complete lines whilst preserving partial messages in the buffer
                     while '\n' in self.data_manager.buffer:
