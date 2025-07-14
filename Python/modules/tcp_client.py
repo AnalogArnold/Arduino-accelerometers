@@ -42,7 +42,7 @@ class TCPClient:
             # Set timeout to 2 seconds so the program doesn't get stuck.
             self.socket.settimeout(2)
             self.socket.connect((host, port))
-            self.socket.settimeout(None)
+            self.socket.settimeout(300) # Longer timeout for the receiving thread
             self.stop_event.set() # Start the program in a stopped state.
             self.receiver_thread = threading.Thread(target=self._receive_data, daemon=True)
             self.receiver_thread.start()
@@ -55,8 +55,8 @@ class TCPClient:
     def disconnect(self):
         """Disconnects from the ESP32 server. Stops the receiver thread and closes the connection."""
         if self.connected:
-            self.socket.close()
             self.socket.shutdown(socket.SHUT_RDWR)
+            self.socket.close()
             self.stop_event.set()
             self.socket = None
             self.connected = False
