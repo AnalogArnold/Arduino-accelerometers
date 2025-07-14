@@ -51,6 +51,7 @@ class TCPClient:
             return False
 
     def disconnect(self):
+        """Disconnects from the ESP32 server. Stops the receiver thread and closes the connection."""
         if self.connected:
             self.socket.close()
             self.socket.shutdown(socket.SHUT_RDWR)
