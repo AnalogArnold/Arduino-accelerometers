@@ -1,11 +1,11 @@
 ##################################################################################################################
 #
 # Class AccelerometerReaderGUI creates a simple graphical user interface to enable the user to easily communicate with
-# the Adafruit board and process the data without having to look at the code. It contains all theme information and
-# uses TCPClient class to establish a connection with the board, and the SensorDataManager class to process the data.
+# the Adafruit board and process the data without having to look at the code. It contains the GUI structure, uses
+# TCPClient class to establish a connection with the board, and the SensorDataManager class to process the data.
 # It also contains a few utility functions to plot the real-time data using the GUI engine.
 #
-# Version: 2.3 (July 2025)
+# Version: 2.4 (July 2025)
 # Author: Michael Darcy
 # License: MIT
 # Copyright (C) 2025 AnalogArnold
@@ -18,9 +18,10 @@ import dearpygui.dearpygui as dpg
 import time
 import os
 from math import ceil
-from modules.sensor_data_manager import SensorDataManager
-from modules.tcp_client import TCPClient
-from PIL import Image
+import modules.gui_style as style
+from modules.sensor_data_manager import SensorDataManager, post_process_dataframe
+from modules.tcp_client import TCPClient, get_current_network
+from modules.global_settings import *
 
 class AccelerometerReaderGUI:
     def __init__(self):
@@ -40,13 +41,14 @@ class AccelerometerReaderGUI:
         dpg.create_context()
         dpg.create_viewport(title='Accelerometer controller', width=1300, height=800)
         self._create_main_window()
-        self._setup_theme()
+        style.setup_gui_theme()
         dpg.set_primary_window("accelerometer_control", True)
         dpg.setup_dearpygui()
-        dpg.set_exit_callback(callback=lambda: self.tcp_client.reset_sensors()) # NEW, to be tested
+        # Reset the sensors when closing the program window
+        dpg.set_exit_callback(callback=lambda: self.tcp_client.reset_sensors())
         dpg.show_viewport()
         # Check network connection before the user does anything else
-        self.tcp_client.get_current_network()
+        get_current_network()
 
     def _create_main_window(self):
         """Creates the primary window for the GUI."""
@@ -76,8 +78,7 @@ class AccelerometerReaderGUI:
                 with dpg.group(horizontal=True):
                     dpg.add_text("Connection status: Not connected", tag="connection_status")
                     dpg.add_text("", tag="connection_warning",  color=(178, 34, 34), wrap=600, indent=240)
-
-                with dpg.tab_bar():
+                with dpg.tab_bar(label="tab_bar"):
                     dpg.add_tab(label="Data acquisition", tag="data_acquisition_tab")
                     dpg.add_tab(label="Post-processing", tag="post_processing_tab")
             self._create_data_acquisition_tab()
@@ -85,8 +86,7 @@ class AccelerometerReaderGUI:
             # Status bar to communicate with the user rather than have to look at the Python IDE
             dpg.add_separator()
             dpg.add_text("Status:", tag="status_header")
-            dpg.add_text("Ready", tag="status")
-                    # with dpg.group(parent="post_processing_tab"):
+            dpg.add_text("Ready", tag=STATUS)
 
     def _create_data_acquisition_tab(self):
         """Creates the contents of the data acquisition tab."""
@@ -98,7 +98,7 @@ class AccelerometerReaderGUI:
                 dpg.add_button(label="Start recording", callback=lambda: self._command_callback(None, "START"))
                 dpg.add_button(label="Stop recording", callback=lambda: self._command_callback(None, "STOP"))
                 dpg.add_button(label="Show live data", callback=self._show_live_plot_window)
-                dpg.add_button(label="Process data", callback=self._show_processing_window)
+                dpg.add_button(label="Process/export data", callback=self._show_processing_window)
                 dpg.add_button(label="Clear data", callback=self._clear_data_callback)
 
             # Data display
@@ -116,10 +116,10 @@ class AccelerometerReaderGUI:
 
             # Table displaying the incoming data
             with dpg.group(horizontal=True):
-                # Define child window with a predefined size - necessary to keep the table with incoming data the
+                # Define the child window with a predefined size - necessary to keep the table with incoming data the
                 # same size rather than stretching the main window indefinitely.
                 with dpg.child_window(width=700, height=400):
-                    with dpg.table(tag="data_log"): # setting header_row = False causes the data not to be displayed?
+                    with dpg.table(tag=DATA_LOG): # setting header_row = False causes the data not to be displayed?
                         for _ in range(5):
                             dpg.add_table_column()
                 # Display information about detected sensors and intervals next to the data log
@@ -156,149 +156,59 @@ class AccelerometerReaderGUI:
                 dpg.add_button(label="Press to select", tag="open_directory_dialog",
                                callback=lambda: self._directory_select_callback("open"))
                 dpg.add_text("Sensor selection       ")
-                dpg.add_combo(["N/A"], default_value="N/A", tag="sensor_choice_post", width=50)
+                dpg.add_combo(["N/A"], default_value="N/A", tag="sensor_choice_post", width=60)
                 dpg.add_text("Processing method ")
                 dpg.add_combo(["Acceleration vs time", "Magnitude of acceleration", "Fast Fourier transform",
                                     "CSV export"], default_value="Acceleration vs time", tag="processing_choice_post",
-                                    width=200, callback=lambda: self._toggle_interval_box("post"))
+                                    width=200, callback=lambda: style.toggle_interval_box("post"))
                 with dpg.group(horizontal=True, tag="interval_box_post", show=False):
                     dpg.add_text("Use custom interval value:")
-                    dpg.add_checkbox(tag="custom_interval_choice", callback=lambda: self._toggle_custom_interval_input())
-                dpg.add_input_double(label="ms", tag="custom_interval_value", min_value=0, max_value=10000, show=False, width=150)
+                    dpg.add_checkbox(tag="custom_interval_choice", callback=lambda: style.toggle_custom_interval_input())
+                dpg.add_input_double(label="ms", tag="custom_interval_value", min_value=0, max_value=10000, show=False,
+                                     width=150)
                 with dpg.group(horizontal=True):
                     dpg.add_text("Save processed data in the same directory:")
                     dpg.add_checkbox(tag="saving_choice_post")
                 dpg.add_button(label="Run processing", callback=lambda:self._processing_callback("post"))
-            # Define child window to display the graphs from the processing
-            dpg.add_child_window(tag="post_processing_graphs", width=600, height=500)
-
-
-    def _toggle_interval_box(self, sender):
-        """Toggles on/off the visibility of the interval options depending on the processing choice - it is only
-        relevant for the FFT."""
-        if sender == "post":
-        # Post-processing tab fields
-            if dpg.get_value("processing_choice_post") == "Fast Fourier transform":
-                dpg.configure_item("interval_box_post", show=True)
-            else:
-            # Hide everything, including the custom interval input.
-                dpg.set_value("custom_interval_choice", False)
-                self._toggle_custom_interval_input()
-                dpg.configure_item("interval_box_post", show=False)
-        else:
-        # Processing in the "data acquisition" tab fields
-            if dpg.get_value("processing_choice") == "Fast Fourier transform":
-                dpg.configure_item("interval_box", show=True)
-            else:
-                dpg.configure_item("interval_box", show=False)
-
-    def _toggle_custom_interval_input(self):
-        """Toggles on/off the visibility of the custom interval input depending on the custom interval checkbox."""
-        if dpg.get_value("custom_interval_choice"):
-            dpg.configure_item("custom_interval_value", show=True)
-        else:
-            dpg.configure_item("custom_interval_value", show=False)
+            # Define the child window to display the graphs from the processing
+            dpg.add_child_window(tag="post_processing_plots", width=650, height=500)
 
     def _update_sensors_for_postprocessing(self):
-        """Updates the sensors list for the post-processing tab by analizing the filenames in the selected folder."""
+        """Updates the sensors list for the post-processing tab by analyzing the filenames in the selected folder."""
         if self.open_directory_path is not None:
             files_detected = os.listdir(self.open_directory_path)
-            # Strip the filenames in the form "S_X someting.type" to detect the sensors IDs for which we have data.
+            # Strip the filenames in the form "S_X something.type" to detect the sensor IDs for which we have data.
             sensor_numbers = [filename.split("_")[1].split(" ")[0] for filename in files_detected]
             sensor_numbers = sorted(list(set(sensor_numbers)))
-            self.post_processing_sensors = sensor_numbers
+            self.post_processing_sensors = sensor_numbers.copy() # To keep them separate
             sensor_numbers.append("All")
             dpg.configure_item("sensor_choice_post", items=sensor_numbers, default_value="All")
         return True
 
-
-    def _setup_theme(self):
-        """Sets up the theme for the GUI."""
-        # Each tuple: (RGB color, [list of theme color constants])
-        theme_col_groups = [
-            ((44, 44, 46), [dpg.mvThemeCol_Text, dpg.mvThemeCol_TextDisabled]),
-            ((242, 242, 247), [dpg.mvThemeCol_WindowBg]),
-            ((229, 229, 234), [dpg.mvThemeCol_ChildBg, dpg.mvThemeCol_PopupBg, dpg.mvThemeCol_TableHeaderBg,
-                               dpg.mvThemeCol_TableRowBg,dpg.mvThemeCol_HeaderHovered, dpg.mvThemeCol_HeaderActive]),
-            ((210, 221, 219), [dpg.mvThemeCol_FrameBg, dpg.mvThemeCol_TitleBg, dpg.mvThemeCol_MenuBarBg,
-                               dpg.mvThemeCol_ScrollbarBg, dpg.mvThemeCol_Button, dpg.mvThemeCol_Tab,
-                               dpg.mvThemeCol_Header]),
-            ((185, 197, 195), [dpg.mvThemeCol_FrameBgHovered, dpg.mvThemeCol_ScrollbarGrab, dpg.mvThemeCol_SliderGrab,
-                               dpg.mvThemeCol_ButtonHovered, dpg.mvThemeCol_TabHovered]),
-            ((163, 178, 175), [dpg.mvThemeCol_FrameBgActive, dpg.mvThemeCol_TitleBgActive,
-                               dpg.mvThemeCol_ScrollbarGrabHovered, dpg.mvThemeCol_SliderGrabActive,
-                               dpg.mvThemeCol_ButtonActive, dpg.mvThemeCol_TabActive, dpg.mvThemeCol_Separator,
-                               dpg.mvThemeCol_SeparatorHovered, dpg.mvThemeCol_SeparatorActive]),
-            ((154, 165, 163), [dpg.mvThemeCol_ScrollbarGrabActive, dpg.mvThemeCol_CheckMark]),
-            ((217, 228, 226), [dpg.mvThemeCol_TitleBgCollapsed])
-        ]
-        style_var_groups = [
-            (dpg.mvStyleVar_WindowPadding, 15, 10),
-            (dpg.mvStyleVar_FrameRounding, 5),
-            (dpg.mvStyleVar_ChildRounding, 5),
-            (dpg.mvStyleVar_FramePadding, 5, 1),
-            (dpg.mvStyleVar_ItemSpacing, 5, 4),
-            (dpg.mvStyleVar_ScrollbarSize, 13),
-            (dpg.mvStyleVar_WindowTitleAlign, 0.5, 0.0)
-        ]
-        # Add the above values to the global theme
-        with dpg.theme() as global_theme:
-            with dpg.theme_component(dpg.mvAll):
-                for color, col_list in theme_col_groups:
-                    for col in col_list:
-                        dpg.add_theme_color(col, color, category=dpg.mvThemeCat_Core)
-                for style_var in style_var_groups:
-                    if len(style_var) == 2:
-                        var, value = style_var
-                        dpg.add_theme_style(var, value, category=dpg.mvThemeCat_Core)
-                    else:
-                        var, x_val, y_val = style_var
-                        dpg.add_theme_style(var, x_val, y_val, category=dpg.mvThemeCat_Core)
-
-        # Define the item theme to make the connect/disconnect buttons stand out more
-        with dpg.theme() as item_theme_connect:
-            with dpg.theme_component(dpg.mvAll):
-                dpg.add_theme_color(dpg.mvThemeCol_Button, (146, 209, 161), category=dpg.mvThemeCat_Core)
-                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (123, 198, 140), category=dpg.mvThemeCat_Core)
-
-        with dpg.theme() as item_theme_disconnect:
-            with dpg.theme_component(dpg.mvAll):
-                dpg.add_theme_color(dpg.mvThemeCol_Button, (219, 98, 77), category=dpg.mvThemeCat_Core)
-                dpg.add_theme_color(dpg.mvThemeCol_ButtonHovered, (190, 90, 72), category=dpg.mvThemeCat_Core)
-
-        # Change the default font to a bigger and more legible one
-        with dpg.font_registry():
-            default_font = dpg.add_font("fonts/SFPRODISPLAYREGULAR.OTF", 18)  # Default font
-            header_font = dpg.add_font("fonts/SFPRODISPLAYBOLD.OTF", 30)  # Font for the header
-            child_header_font = dpg.add_font("fonts/SFPRODISPLAYMEDIUM.OTF", 20)  # Font for the table headers
-
-        # Bind the theme to the GUI
-        dpg.bind_theme(global_theme)
-        dpg.bind_font(default_font)
-        dpg.bind_item_font("program_header", header_font)
-        dpg.bind_item_font("data_log_header", child_header_font)
-        dpg.bind_item_font("post_processing_header", child_header_font)
-        dpg.bind_item_font("status_header", child_header_font)
-        dpg.bind_item_font("detected_sensors_header", child_header_font)
-        dpg.bind_item_theme("connect_button", item_theme_connect)
-        dpg.bind_item_theme("disconnect_button", item_theme_disconnect)
+    def _close_window(self, window_name):
+        """Callback for the close button of data-related windows (live plotting and data processing). Deletes the window
+        and its children (contents; default in delete_item) to avoid DPG's 'alias already exists' error when the window
+        is closed and reopened."""
+        if window_name == "live_plot_window":
+            self.stop_plot_event.set()
+        dpg.delete_item(window_name)
 
     def _connect_callback(self):
         """GUI callback calling the TCP class to establish the local connection with the Adafruit board."""
         host = dpg.get_value("host")
         port = int(dpg.get_value("port"))
-        self.tcp_client.get_current_network()
+        get_current_network()
         if self.tcp_client.connect(host, port):
-            dpg.set_value("status", "Connected successfully!")
+            dpg.set_value(STATUS, "Connected successfully!")
             dpg.set_value("connection_status", "Connection status: Connected")
             dpg.set_value("connection_warning", "")
         else:
-            dpg.set_value("status", "Cannot connect.")
+            dpg.set_value(STATUS, "Cannot connect.")
 
     def _disconnect_callback(self):
         """GUI callback calling the TCP class to disconnect from the Adafruit board."""
         if self.tcp_client.disconnect():
-            dpg.set_value("status", "Disconnected successfully!")
+            dpg.set_value(STATUS, "Disconnected successfully!")
 
     def _command_callback(self, sender, command):
         """Guides the app and Adafruit behavior depending on the command selected by the user from the menu bar."""
@@ -310,9 +220,9 @@ class AccelerometerReaderGUI:
                     self._start_recording()
                 else:
                     self.tcp_client.stop_recording()
-                dpg.set_value("status", f"Sent command: {command}")
+                dpg.set_value(STATUS, f"Sent command: {command}")
         else:
-            dpg.set_value("status", "Connect to the board to record data or change the sensor parameters.")
+            dpg.set_value(STATUS, "Connect to the board to record data or change the sensor parameters.")
             # Reset to the default value to reflect the lack of change in hardware
             dpg.set_value("datarate_choice", "1 Hz")
             dpg.set_value("range_choice", "2 G")
@@ -324,6 +234,15 @@ class AccelerometerReaderGUI:
         self.tcp_client.stop_event.clear()
         self.tcp_client.send_command("START")
 
+    def _clear_data_callback(self):
+        """Clears the values of the variables but without disconnecting, i.e., the TCP data is stored."""
+        self.data_manager.clear_data()
+        # Clear the data log
+        for child in dpg.get_item_children('data_log')[1]:
+            dpg.delete_item(child)
+        dpg.set_value(STATUS, "Data cleared successfully")
+        dpg.set_value("actual_interval_info", "")
+
     def _show_processing_window(self):
         """Displays and handles the window with data processing options."""
         with dpg.window(label="Processing options", tag="processing_window",
@@ -332,7 +251,7 @@ class AccelerometerReaderGUI:
                          wrap=350)
             sensors_list = list(self.data_manager.active_sensors)
             sensors_list.append('All')
-            # Horizontal group and text instead of a label because labels are to the right and it cannot be easily
+            # Horizontal group and text instead of a label because labels are to the right, and it cannot be easily
             # changed through attributes.
             with dpg.group(horizontal=True):
                 dpg.add_text("Sensor selection       ")
@@ -342,7 +261,7 @@ class AccelerometerReaderGUI:
                 dpg.add_combo(
                     ["Acceleration vs time", "Magnitude of acceleration", "Fast Fourier transform", "CSV export"],
                     default_value="Acceleration vs time", tag="processing_choice", width=200,
-                    callback=lambda: self._toggle_interval_box("live"))
+                    callback=lambda: style.toggle_interval_box("live"))
             with dpg.group(horizontal=True, tag="interval_box", show=False):
                 dpg.add_text("Use interval value ")
                 dpg.add_combo(["Actual", "Approximate (expected)"], default_value="Actual", tag="interval_choice",
@@ -357,16 +276,17 @@ class AccelerometerReaderGUI:
         if sender == "post":
         # Post-processing tab fields
             if self.open_directory_path is None:
-                dpg.set_value("status", "Select a folder with the data to process first.")
+                dpg.set_value(STATUS, "Select a folder with the data to process first.")
             else:
                 sensor_choice = dpg.get_value("sensor_choice_post")
                 sensor_list = self.post_processing_sensors if sensor_choice == "All" else list(sensor_choice)
-                self.data_manager.post_process_dataframe(self.open_directory_path, sensor_list)
+                post_process_dataframe(self.open_directory_path, sensor_list)
         else:
         # Processing in the "data acquisition" tab fields
             if dpg.get_value("processing_choice") == "CSV export" and self.save_directory_path is None:
                 with dpg.window(tag="processing_warning_popup", modal=True, no_title_bar=True, width=400):
-                    dpg.add_text("Warning! You haven't selected a directory to save the CSV file. The processing will return nothing.", wrap=390)
+                    dpg.add_text("Warning! You haven't selected a directory to save the CSV file. The processing will return nothing.",
+                                 wrap=390)
                     dpg.add_button(label="OK", callback=lambda: dpg.delete_item("processing_warning_popup"))
                     return
             self.data_manager.process_dataframe(self.save_directory_path)
@@ -376,7 +296,7 @@ class AccelerometerReaderGUI:
         will be stored, then saves its path to the GUI."""
         filepath = tkinter.filedialog.askdirectory()
         if filepath:
-            # Choose directory either for saving or opening the processed data files.
+            # Choose a directory either for saving or opening the processed data files.
             if mode == "save":
                 self.save_directory_path = filepath + "/Processed data"
                 dpg.set_value("chosen_save_directory_log", f"{self.save_directory_path}")
@@ -386,20 +306,11 @@ class AccelerometerReaderGUI:
                 self._update_sensors_for_postprocessing()
                 dpg.set_value("chosen_open_directory_log", f"{self.open_directory_path}")
 
-    def _close_window(self, window_name):
-        """Callback for the close button of data-related windows (live plotting and data processing). Deletes the window
-        and its children (contents; default in delete_item) to avoid DPG's 'alias already exists' error when the window
-        is closed and reopened."""
-        if window_name == "live_plot_window":
-            self.stop_plot_event.set()
-        dpg.delete_item(window_name)
-
-
     def _show_live_plot_window(self):
         """Displays and handles the window processing the data in real time."""
         with dpg.window(label="Live data", tag="live_plot_window", autosize=True, pos=[500, 0],
                         on_close=lambda:self._close_window("live_plot_window")):
-            # Stack the plots together in 2 columns and number of rows dependent on the number of active sensors
+            # Stack the plots together in 2 columns and a number of rows dependent on the number of active sensors
             # Check if there is any data to plot (if there are sensors detected, it should not be)
             if bool(self.data_manager.active_sensors):
                 # Create a group to display the subplots in 2 groups.
@@ -424,7 +335,7 @@ class AccelerometerReaderGUI:
 
     def _plot_live_data(self, subplot_tags):
         """Plots the real-time acceleration vs time data for all detected sensors."""
-        labels = ["x-acceleration", "y-acceleration", "z-acceleration"]
+        labels = [X_DATA, Y_DATA, Z_DATA]
         while True:
             try:
              # Plot only if the event flag is not set and the window exists (to prevent dpg crashes)
@@ -442,8 +353,8 @@ class AccelerometerReaderGUI:
                             # Pause plotting is the recording is paused too
                             if self.tcp_client.stop_event.is_set():
                                 self.stop_plot_event.set()
-                    # If recording is restarted, re-open the window (to reset the data, mostly if more/less sensors have
-                    # been connected. Then start plotting
+                    # If recording is restarted, re-open the window to reset the data, mostly if more/fewer sensors
+                    # have been connected. Then start plotting
                     elif not self.tcp_client.stop_event.is_set() and self.stop_plot_event.is_set():
                         self._close_window("live_plot_window")
                         time.sleep(1) # Short delay to fetch enough data to initialize all subplots
@@ -454,7 +365,7 @@ class AccelerometerReaderGUI:
     def _create_plot_on_subplot(self, sensor_id, label, x_tag, y_tag, subplot_tag):
         """Either creates individual plots on a subplot or adds values and re-adjusts the axes on existing ones."""
         plot_tag = f"plot_s_{sensor_id}_{label}"
-        x_time = self.data_manager.data[sensor_id]["normalized_timestamp"]
+        x_time = self.data_manager.data[sensor_id][NORMALIZED_TIMESTAMP]
         y_data = self.data_manager.data[sensor_id][label]
         if not dpg.does_item_exist(plot_tag):
             with dpg.plot(parent=subplot_tag):
@@ -462,21 +373,12 @@ class AccelerometerReaderGUI:
                 dpg.add_plot_axis(dpg.mvYAxis, label=label, no_gridlines=True, tag=y_tag)
                 dpg.add_line_series(x_time, y_data, parent=y_tag, tag=plot_tag)  # Plot
                 # Remove the ticks and labels from the upper x-axes since they're shared
-                if label != "z-acceleration":
+                if label != Z_DATA:
                     dpg.configure_item(x_tag, no_tick_marks=True, no_tick_labels=True, label="")
         else:
             dpg.fit_axis_data(x_tag)
             dpg.fit_axis_data(y_tag)
             dpg.configure_item(plot_tag, x=x_time, y=y_data)
-
-    def _clear_data_callback(self):
-        """Clears the values of the variables but without disconnecting, i.e., the TCP data is stored."""
-        self.data_manager.clear_data()
-        # Clear the data log
-        for child in dpg.get_item_children('data_log')[1]:
-            dpg.delete_item(child)
-        dpg.set_value("status", "Data cleared successfully")
-        dpg.set_value("actual_interval_info", "")
 
     def run(self):
         dpg.start_dearpygui()
