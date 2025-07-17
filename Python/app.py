@@ -2,7 +2,7 @@
 #
 # Main file for the accelerometer reader.
 #
-# Version: Version: 2.3 (July 2025)
+# Version: Version: 2.4 (July 2025)
 # Author: Michael Darcy
 # License: MIT
 # Copyright (C) 2025 AnalogArnold
