@@ -158,8 +158,8 @@ class AccelerometerReaderGUI:
                 dpg.add_text("Sensor selection       ")
                 dpg.add_combo(["N/A"], default_value="N/A", tag="sensor_choice_post", width=60)
                 dpg.add_text("Processing method ")
-                dpg.add_combo(["Acceleration vs time", "Magnitude of acceleration", "Fast Fourier transform",
-                                    "CSV export"], default_value="Acceleration vs time", tag="processing_choice_post",
+                dpg.add_combo(["Acceleration vs time", "Magnitude of acceleration", "Fast Fourier transform",],
+                                     default_value="Acceleration vs time", tag="processing_choice_post",
                                     width=200, callback=lambda: style.toggle_interval_box("post"))
                 with dpg.group(horizontal=True, tag="interval_box_post", show=False):
                     dpg.add_text("Use custom interval value:")
@@ -260,7 +260,7 @@ class AccelerometerReaderGUI:
                 dpg.add_text("Processing method ")
                 dpg.add_combo(
                     ["Acceleration vs time", "Magnitude of acceleration", "Fast Fourier transform", "CSV export"],
-                    default_value="Acceleration vs time", tag="processing_choice", width=200,
+                    default_value="CSV export", tag="processing_choice", width=200,
                     callback=lambda: style.toggle_interval_box("live"))
             with dpg.group(horizontal=True, tag="interval_box", show=False):
                 dpg.add_text("Use interval value ")
